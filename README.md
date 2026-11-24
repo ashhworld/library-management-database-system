@@ -60,15 +60,31 @@ This project demonstrates the practical implementation of:
 
 ✅ Register users
 
-✅ Issue books
+✅ Issue books only when a copy is available
 
-✅ Return books
+✅ Return only currently issued or overdue transactions
 
-✅ Track book availability
+✅ Track book availability safely with row locking
+
+✅ Store due dates and calculate overdue status
+
+✅ Validate inventory quantities and date values
 
 ✅ View transaction history
 
 ✅ Monitor overdue books
+
+## Issue and Return Procedures
+
+Use these stored procedures instead of updating tables manually:
+
+```sql
+CALL Issue_Book(1, 1, CURDATE(), 15);
+CALL Return_Book(1, CURDATE());
+CALL Refresh_Overdue_Status();
+```
+
+`Issue_Book` verifies that the user and book exist and that at least one copy is available. It then creates the transaction and deducts inventory inside the same transaction. `Return_Book` verifies that the transaction is active and has not already been returned before adding one copy back. `Refresh_Overdue_Status` marks due loans overdue and can restore an issued status if a transaction's due date is corrected.
 
 ## SQL Concepts Implemented
 

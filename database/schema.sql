@@ -1,5 +1,5 @@
 -- Create Database
-CREATE DATABASE LibraryManagement;
+CREATE DATABASE IF NOT EXISTS LibraryManagement;
 
 USE LibraryManagement;
 
@@ -13,11 +13,14 @@ CREATE TABLE Books (
     Publisher VARCHAR(100),
     ISBN VARCHAR(20) UNIQUE,
     Category VARCHAR(50),
-    Total_Copies INT NOT NULL,
-    Available_Copies INT NOT NULL
+    Total_Copies INT NOT NULL CHECK (Total_Copies >= 0),
+    Available_Copies INT NOT NULL CHECK (
+        Available_Copies >= 0
+        AND Available_Copies <= Total_Copies
+    )
 );
 
--- User TABLE
+-- Users Table
 -- ---------------------------------------------
 
 CREATE TABLE Users (
@@ -28,20 +31,26 @@ CREATE TABLE Users (
     Membership_Date DATE
 );
 
--- Transactions TABLE
+-- Transactions Table
 -- ---------------------------------------------------
 
 CREATE TABLE Transactions (
     Transaction_ID INT AUTO_INCREMENT PRIMARY KEY,
-    User_ID INT,
-    Book_ID INT,
+    User_ID INT NOT NULL,
+    Book_ID INT NOT NULL,
     Issue_Date DATE NOT NULL,
+    Due_Date DATE NOT NULL,
     Return_Date DATE,
-    Status ENUM('Issued','Returned') DEFAULT 'Issued',
+    Status ENUM('Issued', 'Returned', 'Overdue') NOT NULL DEFAULT 'Issued',
 
-    FOREIGN KEY (User_ID)
-        REFERENCES Users(User_ID),
+    CONSTRAINT chk_due_date
+        CHECK (Due_Date >= Issue_Date),
+    CONSTRAINT chk_return_date
+        CHECK (Return_Date IS NULL OR Return_Date >= Issue_Date),
 
-    FOREIGN KEY (Book_ID)
-        REFERENCES Books(Book_ID)
+    CONSTRAINT fk_transaction_user
+        FOREIGN KEY (User_ID) REFERENCES Users(User_ID),
+
+    CONSTRAINT fk_transaction_book
+        FOREIGN KEY (Book_ID) REFERENCES Books(Book_ID)
 );
