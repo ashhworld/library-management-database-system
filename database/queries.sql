@@ -81,4 +81,24 @@ JOIN Books b
 ON b.Book_ID = t.Book_ID
 GROUP BY b.Category;
 
+-- Fine report
+CALL Refresh_Overdue_Status();
+
+SELECT
+    f.Fine_ID,
+    u.Full_Name,
+    b.Title,
+    f.Fine_Amount,
+    f.Payment_Status,
+    f.Paid_At
+FROM Fines f
+JOIN Transactions t ON t.Transaction_ID = f.Transaction_ID
+JOIN Users u ON u.User_ID = t.User_ID
+JOIN Books b ON b.Book_ID = t.Book_ID
+ORDER BY f.Fine_Amount DESC;
+
+-- Audit and index verification examples
+SHOW INDEXES FROM Transactions;
+SHOW INDEXES FROM Fines;
+
 

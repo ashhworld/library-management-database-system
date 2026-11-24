@@ -74,6 +74,18 @@ This project demonstrates the practical implementation of:
 
 ✅ Monitor overdue books
 
+✅ Prevent a user from borrowing the same book twice at once
+
+✅ Validate email and ISBN formats
+
+✅ Track fine amounts and payment status
+
+✅ Maintain creation and update audit timestamps
+
+✅ Index foreign keys and frequently queried fields
+
+✅ Automatically refresh overdue status with a scheduled event
+
 ## Issue and Return Procedures
 
 Use these stored procedures instead of updating tables manually:
@@ -82,9 +94,10 @@ Use these stored procedures instead of updating tables manually:
 CALL Issue_Book(1, 1, CURDATE(), 15);
 CALL Return_Book(1, CURDATE());
 CALL Refresh_Overdue_Status();
+CALL Mark_Fine_Paid(1);
 ```
 
-`Issue_Book` verifies that the user and book exist and that at least one copy is available. It then creates the transaction and deducts inventory inside the same transaction. `Return_Book` verifies that the transaction is active and has not already been returned before adding one copy back. `Refresh_Overdue_Status` marks due loans overdue and can restore an issued status if a transaction's due date is corrected.
+`Issue_Book` verifies that the user and book exist and that at least one copy is available. It then creates the transaction and deducts inventory inside the same transaction. `Return_Book` verifies that the transaction is active and has not already been returned before adding one copy back. `Refresh_Overdue_Status` marks due loans overdue and can restore an issued status if a transaction's due date is corrected. `Mark_Fine_Paid` updates the fine payment status for a transaction.
 
 ## SQL Concepts Implemented
 

@@ -120,6 +120,50 @@ BEGIN
     COMMIT;
 END$$
 
+CREATE TRIGGER trg_transactions_prevent_duplicate_issue
+BEFORE INSERT ON Transactions
+FOR EACH ROW
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM Transactions
+        WHERE User_ID = NEW.User_ID
+          AND Book_ID = NEW.Book_ID
+          AND Status IN ('Issued', 'Overdue')
+          AND Return_Date IS NULL
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Duplicate issue: this user has already borrowed this book';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_transactions_return_fine
+AFTER UPDATE ON Transactions
+FOR EACH ROW
+BEGIN
+    DECLARE v_days_late INT DEFAULT 0;
+    DECLARE v_effective_return DATE;
+
+    IF NEW.Status = 'Returned' AND OLD.Status <> 'Returned' THEN
+        SET v_effective_return = NEW.Return_Date;
+
+        IF v_effective_return > NEW.Due_Date THEN
+            SET v_days_late = DATEDIFF(v_effective_return, NEW.Due_Date);
+
+            INSERT INTO Fines
+                (Transaction_ID, Fine_Amount, Daily_Rate, Payment_Status)
+            VALUES
+                (NEW.Transaction_ID,
+                 v_days_late * 1.00,
+                 1.00,
+                 'Unpaid')
+            ON DUPLICATE KEY UPDATE
+                Fine_Amount = VALUES(Fine_Amount),
+                Updated_At = CURRENT_TIMESTAMP;
+        END IF;
+    END IF;
+END$$
+
 CREATE PROCEDURE Refresh_Overdue_Status()
 BEGIN
     UPDATE Transactions
@@ -133,11 +177,49 @@ BEGIN
     WHERE Status = 'Overdue'
       AND Return_Date IS NULL
       AND Due_Date >= CURDATE();
+
+    INSERT INTO Fines
+        (Transaction_ID, Fine_Amount, Daily_Rate, Payment_Status)
+    SELECT
+        Transaction_ID,
+        DATEDIFF(CURDATE(), Due_Date) * 1.00,
+        1.00,
+        'Unpaid'
+    FROM Transactions
+    WHERE Status = 'Overdue'
+      AND Return_Date IS NULL
+      AND Due_Date < CURDATE()
+    ON DUPLICATE KEY UPDATE
+        Fine_Amount = VALUES(Fine_Amount),
+        Updated_At = CURRENT_TIMESTAMP;
+END$$
+
+CREATE PROCEDURE Mark_Fine_Paid(IN p_Transaction_ID INT)
+BEGIN
+    UPDATE Fines
+    SET Payment_Status = 'Paid',
+        Paid_At = CURRENT_TIMESTAMP
+    WHERE Transaction_ID = p_Transaction_ID;
+
+    IF ROW_COUNT() <> 1 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'No fine exists for this transaction';
+    END IF;
 END$$
 
 DELIMITER ;
+
+SET GLOBAL event_scheduler = ON;
+
+CREATE EVENT IF NOT EXISTS ev_refresh_library_status
+ON SCHEDULE EVERY 1 DAY
+DO CALL Refresh_Overdue_Status();
+
+-- Run once when procedures are loaded.
+CALL Refresh_Overdue_Status();
 
 -- Examples:
 -- CALL Issue_Book(1, 1, CURDATE(), 15);
 -- CALL Return_Book(1, CURDATE());
 -- CALL Refresh_Overdue_Status();
+-- CALL Mark_Fine_Paid(1);
